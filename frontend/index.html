@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking Paste Italiane</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Icone SVG
+        const ChefHat = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
+                <line x1="6" y1="17" x2="18" y2="17"/>
+            </svg>
+        );
+
+        const Trophy = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+                <path d="M4 22h16"/>
+                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+            </svg>
+        );
+
+        const PastaRankingApp = () => {
+            const initialPastas = [
+                "Ragù alla Bolognese", "Norma", "Vongole", "Cacio e Pepe",
+                "Pesto", "Gricia", "Amatriciana", "Carbonara"
+            ];
+
+            const [stage, setStage] = useState('intro');
+            const [userName, setUserName] = useState('');
+            const [userGender, setUserGender] = useState('');
+            const [userYear, setUserYear] = useState('');
+            const [errors, setErrors] = useState({});
+            const [saveStatus, setSaveStatus] = useState('');
+
+            const [pastas, setPastas] = useState([...initialPastas]);
+            const [scores, setScores] = useState(Array(initialPastas.length).fill(0));
+            const [currentI, setCurrentI] = useState(0);
+            const [currentJ, setCurrentJ] = useState(1);
+            const [firstC, setFirstC] = useState(0);
+            const [finalRanking, setFinalRanking] = useState([]);
+
+            const massimo = (a, b) => {
+                const op1 = a + 1;
+                const op2 = b + 1;
+                return op1 >= op2 ? op1 : op2;
+            };
+
+            const validateUserInfo = () => {
+                const newErrors = {};
+                
+                if (!userName.trim()) {
+                    newErrors.name = "Inserisci il tuo nome";
+                } else if (!/^[A-Za-z ]+$/.test(userName)) {
+                    newErrors.name = "Usa solo lettere e spazi";
+                }
+
+                if (!userGender) {
+                    newErrors.gender = "Seleziona il tuo genere";
+                }
+
+                const year = parseInt(userYear);
+                const currentYear = new Date().getFullYear();
+                if (!userYear) {
+                    newErrors.year = "Inserisci l'anno di nascita";
+                } else if (isNaN(year)) {
+                    newErrors.year = "Inserisci un numero valido";
+                } else if (year < currentYear - 100 || year > currentYear - 3) {
+                    newErrors.year = "Anno improbabile";
+                }
+
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            const startVoting = () => {
+                if (validateUserInfo()) {
+                    setStage('voting');
+                }
+            };
+
+            const handleVote = (choice) => {
+                let newScores = [...scores];
+                let newI = currentI;
+                let newJ = currentJ;
+                let newFirstC = firstC;
+
+                if (choice === 1) {
+                    newScores[currentI] = newScores[currentI] + 1;
+                    newJ = currentJ + 1;
+                    newFirstC = newScores[currentI];
+                } else {
+                    newScores[currentJ] = massimo(newScores[currentI], newScores[currentJ]);
+                    newI = currentJ;
+                    newFirstC = newScores[currentJ];
+                    newJ = currentJ + 1;
+                }
+
+                setScores(newScores);
+
+                if (newFirstC >= pastas.length - 1) {
+                    completeRound(newScores, newI);
+                } else {
+                    setCurrentI(newI);
+                    setCurrentJ(newJ);
+                    setFirstC(newFirstC);
+                }
+            };
+
+            const completeRound = (currentScores, lastI) => {
+                const maxScore = Math.max(...currentScores);
+                const winnerIndex = currentScores.indexOf(maxScore);
+                
+                const newRanking = [...finalRanking];
+                newRanking.push({
+                    pasta: pastas[winnerIndex],
+                    score: currentScores[winnerIndex]
+                });
+
+                const newPastas = pastas.filter((_, idx) => idx !== winnerIndex);
+                const newScores = currentScores.filter((_, idx) => idx !== winnerIndex);
+
+                if (newPastas.length === 1) {
+                    newRanking.push({ pasta: newPastas[0], score: newScores[0] });
+                    
+                    const sortedRanking = newRanking.sort((a, b) => b.score - a.score);
+                    const withRanks = sortedRanking.map((item, idx) => ({
+                        ...item,
+                        rank: idx + 1
+                    }));
+                    
+                    setFinalRanking(withRanks);
+                    setStage('results');
+                    saveResults(withRanks);
+                } else {
+                    setFinalRanking(newRanking);
+                    setPastas(newPastas);
+                    setScores(newScores);
+                    
+                    let newI = 0;
+                    let newJ = 1;
+                    
+                    if (newScores.length > 0) {
+                        const nextMaxIdx = newScores.indexOf(Math.max(...newScores));
+                        newI = nextMaxIdx;
+                        newJ = nextMaxIdx < newScores.length - 1 ? nextMaxIdx + 1 : 0;
+                    }
+                    
+                    setCurrentI(newI);
+                    setCurrentJ(newJ);
+                    setFirstC(0);
+                }
+            };
+
+            const saveResults = async (ranking) => {
+                const dbData = {
+                    nome: userName.trim(),
+                    sesso: userGender,
+                    anno_di_nascita: parseInt(userYear),
+                    data: new Date().toISOString().split('T')[0],
+                    ...ranking.reduce((acc, item) => {
+                        // Normalizza il nome della pasta rimuovendo accenti e caratteri speciali
+                        let key = item.pasta
+                            .toLowerCase()
+                            .normalize("NFD")
+                            .replace(/[\u0300-\u036f]/g, "") // Rimuove accenti
+                            .replace(/ /g, '_');
+                        
+                        acc[key] = item.rank;
+                        return acc;
+                    }, {})
+                };
+
+                console.log('📤 Invio dati al server:', dbData);
+                setSaveStatus('saving');
+                
+                try {
+                    const response = await fetch('http://localhost:5000/api/save-ranking', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dbData)
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        console.log('✅ Dati salvati con successo!', result);
+                        setSaveStatus('success');
+                    } else {
+                        console.error('❌ Errore nel salvataggio:', result);
+                        setSaveStatus('error');
+                    }
+                } catch (error) {
+                    console.error('❌ Errore di connessione:', error);
+                    setSaveStatus('error');
+                }
+            };
+
+            const restart = () => {
+                setPastas([...initialPastas]);
+                setScores(Array(initialPastas.length).fill(0));
+                setCurrentI(0);
+                setCurrentJ(1);
+                setFirstC(0);
+                setFinalRanking([]);
+                setStage('intro');
+                setUserName('');
+                setUserGender('');
+                setUserYear('');
+                setErrors({});
+                setSaveStatus('');
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 p-4">
+                    <div className="max-w-2xl mx-auto">
+                        
+                        {stage === 'intro' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+                                <div className="flex justify-center mb-6 text-red-600">
+                                    <ChefHat />
+                                </div>
+                                <h1 className="text-4xl font-bold text-gray-800 mb-4">
+                                    Ranking Paste Italiane
+                                </h1>
+                                <p className="text-gray-600 mb-8 text-lg">
+                                    Scopri quale pasta preferisci attraverso confronti a coppie!
+                                </p>
+                                <button
+                                    onClick={() => setStage('userInfo')}
+                                    className="bg-red-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-red-700 transition-colors"
+                                >
+                                    Inizia
+                                </button>
+                            </div>
+                        )}
+
+                        {stage === 'userInfo' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-8">
+                                <h2 className="text-3xl font-bold text-gray-800 mb-6">I tuoi dati</h2>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-gray-700 font-medium mb-2">Nome</label>
+                                        <input
+                                            type="text"
+                                            value={userName}
+                                            onChange={(e) => setUserName(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                            placeholder="Mario Rossi"
+                                        />
+                                        {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-700 font-medium mb-2">Genere</label>
+                                        <div className="flex gap-4">
+                                            {[
+                                                { value: 'M', label: 'Maschio' },
+                                                { value: 'F', label: 'Femmina' },
+                                                { value: 'A', label: 'Altro' }
+                                            ].map(({ value, label }) => (
+                                                <button
+                                                    key={value}
+                                                    onClick={() => setUserGender(value)}
+                                                    className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
+                                                        userGender === value
+                                                            ? 'bg-red-600 text-white'
+                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {errors.gender && <p className="text-red-600 text-sm mt-1">{errors.gender}</p>}
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-700 font-medium mb-2">Anno di nascita</label>
+                                        <input
+                                            type="number"
+                                            value={userYear}
+                                            onChange={(e) => setUserYear(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                            placeholder="1990"
+                                        />
+                                        {errors.year && <p className="text-red-600 text-sm mt-1">{errors.year}</p>}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={startVoting}
+                                    className="w-full bg-red-600 text-white px-6 py-4 rounded-lg text-lg font-semibold hover:bg-red-700 transition-colors mt-6"
+                                >
+                                    Continua
+                                </button>
+                            </div>
+                        )}
+
+                        {stage === 'voting' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-8">
+                                <div className="mb-6">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm text-gray-600">
+                                            Paste rimaste: {pastas.length}
+                                        </span>
+                                        <span className="text-sm text-gray-600">
+                                            Progresso: {Math.round(((initialPastas.length - pastas.length) / initialPastas.length) * 100)}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div
+                                            className="bg-red-600 h-2 rounded-full transition-all"
+                                            style={{ width: `${((initialPastas.length - pastas.length) / initialPastas.length) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <h2 className="text-2xl font-bold text-gray-800 mb-8 text-center">
+                                    Quale preferisci?
+                                </h2>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button
+                                        onClick={() => handleVote(1)}
+                                        className="bg-gradient-to-br from-red-500 to-red-600 text-white p-8 rounded-xl text-2xl font-bold hover:from-red-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg"
+                                    >
+                                        {pastas[currentI]}
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleVote(2)}
+                                        className="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-8 rounded-xl text-2xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all transform hover:scale-105 shadow-lg"
+                                    >
+                                        {pastas[currentJ]}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {stage === 'results' && (
+                            <div className="bg-white rounded-2xl shadow-xl p-8">
+                                <div className="flex justify-center mb-6">
+                                    <Trophy className="w-16 h-16 text-yellow-500" />
+                                </div>
+                                
+                                <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">
+                                    La tua classifica!
+                                </h2>
+                                <p className="text-gray-600 text-center mb-4">
+                                    Ciao {userName}, ecco le tue paste preferite
+                                </p>
+
+                                {saveStatus === 'saving' && (
+                                    <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-4 text-center">
+                                        💾 Salvataggio in corso...
+                                    </div>
+                                )}
+                                {saveStatus === 'success' && (
+                                    <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4 text-center">
+                                        ✅ Dati salvati con successo!
+                                    </div>
+                                )}
+                                {saveStatus === 'error' && (
+                                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-center">
+                                        ❌ Errore nel salvataggio. Controlla la console.
+                                    </div>
+                                )}
+
+                                <div className="space-y-3 mb-6">
+                                    {finalRanking.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`flex items-center justify-between p-4 rounded-lg ${
+                                                idx === 0
+                                                    ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 border-2 border-yellow-400'
+                                                    : idx === 1
+                                                    ? 'bg-gradient-to-r from-gray-100 to-gray-200 border-2 border-gray-400'
+                                                    : idx === 2
+                                                    ? 'bg-gradient-to-r from-orange-100 to-orange-200 border-2 border-orange-400'
+                                                    : 'bg-gray-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-2xl font-bold text-gray-700 w-8">
+                                                    {item.rank}°
+                                                </span>
+                                                <span className="text-lg font-medium text-gray-800">
+                                                    {item.pasta}
+                                                </span>
+                                            </div>
+                                            {idx < 3 && (
+                                                <Trophy className={`w-6 h-6 ${
+                                                    idx === 0 ? 'text-yellow-500' :
+                                                    idx === 1 ? 'text-gray-500' :
+                                                    'text-orange-500'
+                                                }`} />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={restart}
+                                    className="w-full bg-red-600 text-white px-6 py-4 rounded-lg text-lg font-semibold hover:bg-red-700 transition-colors"
+                                >
+                                    Ricomincia
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<PastaRankingApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
